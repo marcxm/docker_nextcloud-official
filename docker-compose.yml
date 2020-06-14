@@ -1,0 +1,71 @@
+version: '3'
+
+services:
+  nextcloud-official-db:
+    image: mariadb
+    container_name: nextcloud-official-db
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    restart: always
+    volumes:
+      - ./db:/var/lib/mysql
+    environment:
+      - MYSQL_HOST=nextcloud-official-db
+      - MYSQL_ROOT_PASSWORD=nextcloud
+      - MYSQL_PASSWORD=nextcloud
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+    networks:
+      mynetwork:
+
+  nextcloud-official-redis:
+    image: redis:alpine
+    container_name: nextcloud-official-redis
+    restart: always
+    volumes:
+       - ./data:/data
+    networks:
+      mynetwork:
+
+  nextcloud-official-app:
+    image: nextcloud:apache
+    container_name: nextcloud-official-app
+    restart: always
+    ports:
+      - 8044:80
+    volumes:
+      - ./nextcloud:/var/www/html
+    environment:
+      - MYSQL_HOST=nextcloud-official-db
+      - MYSQL_ROOT_PASSWORD=nextcloud
+      - MYSQL_PASSWORD=nextcloud
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - REDIS_HOST=nextcloud-official-redis
+      - APACHE_DISABLE_REWRITE_IP="1"
+      - TRUSTED_PROXIES=letsencrypt
+      - TRUSTED_DOMAINS="192.168.2.8:8044 my.domain.org"
+      - NEXTCLOUD_TRUSTED_DOMAINS="192.168.2.8:8044 my.domain.org"
+      - OVERWRITEWEBROOT=/nextcloud
+    depends_on:
+      - nextcloud-official-db
+      - nextcloud-official-redis
+    networks:
+      mynetwork:
+
+  nextcloud-official-cron:
+    image: nextcloud:apache
+    container_name: nextcloud-official-cron
+    restart: always
+    volumes:
+      - ./nextcloud:/var/www/html
+    entrypoint: /cron.sh
+    depends_on:
+      - nextcloud-official-db
+      - nextcloud-official-redis
+    networks:
+      mynetwork:
+
+networks:
+  mynetwork:
+    external:
+      name: mynetwork
